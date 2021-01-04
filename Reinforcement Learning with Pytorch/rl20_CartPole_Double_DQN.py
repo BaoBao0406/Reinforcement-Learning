@@ -33,6 +33,7 @@ replay_mem_size = 50000
 batch_size = 32
 update_target_frequency = 500
 clip_error = False
+double_dqn = True
 
 number_of_inputs = env.observation_space.shape[0]
 number_of_outputs = env.action_space.n
@@ -117,8 +118,17 @@ class QNet_Agent(object):
         action = LongTensor(action).to(device)
         done = Tensor(done).to(device)
         
-        new_state_values = self.target_nn(new_state).detach()
-        max_new_state_values = torch.max(new_state_values, 1)[0]
+        # Find the best action using updated NN and calculate the value of the best action using Target NN
+        if double_dqn:
+            new_state_indexes = self.nn(new_state).detach()
+            max_new_state_indexes = torch.max(new_state_indexes, 1)[1]
+            
+            new_state_values = self.target_nn(new_state).detach()
+            max_new_state_values = new_state_values.gather(1, max_new_state_indexes.unsqueeze(1)).squeeze(1)
+        else:
+            new_state_values = self.target_nn(new_state).detach()
+            max_new_state_values = torch.max(new_state_values, 1)[0]
+            
         target_value = reward + (1 - done) * gamma * max_new_state_values
         
         # gather and squeeze func are used to match the dimision size of the target for Loss func
